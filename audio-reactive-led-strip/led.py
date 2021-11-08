@@ -70,6 +70,11 @@ def _update_esp8266():
     idx = np.array_split(idx, n_packets)
     for packet_indices in idx:
         m = '' if _is_python_2 else []
+        if _is_python_2:
+            m+= chr(1) + chr(2)
+        else:
+            m.append(1)
+            m.append(2)
         for i in packet_indices:
             if _is_python_2:
                 m += chr(i) + chr(p[0][i]) + chr(p[1][i]) + chr(p[2][i])
