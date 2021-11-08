@@ -1,3 +1,5 @@
+# based on https://github.com/scottlawsonbc/audio-reactive-led-strip/blob/master/python/led.py
+# via https://kno.wled.ge/interfaces/udp-realtime/#setup-with-arls
 import numpy as np
 
 # inlined from config.py
