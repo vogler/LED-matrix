@@ -1,17 +1,17 @@
-from __future__ import print_function
-from __future__ import division
-
-import platform
 import numpy as np
-import config
+
+# inlined from config.py
+UDP_IP = '192.168.178.100'
+UDP_PORT = 21324
+N_PIXELS = 256
 
 import socket
 _sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-_prev_pixels = np.tile(253, (3, config.N_PIXELS))
+_prev_pixels = np.tile(253, (3, N_PIXELS))
 """Pixel values that were most recently displayed on the LED strip"""
 
-pixels = np.tile(1, (3, config.N_PIXELS))
+pixels = np.tile(1, (3, N_PIXELS))
 """Pixel values for the LED strip"""
 
 def update():
@@ -44,7 +44,7 @@ def update():
             m.append(p[0][i])  # Pixel red value
             m.append(p[1][i])  # Pixel green value
             m.append(p[2][i])  # Pixel blue value
-        _sock.sendto(bytes(m), (config.UDP_IP, config.UDP_PORT))
+        _sock.sendto(bytes(m), (UDP_IP, UDP_PORT))
     _prev_pixels = np.copy(p)
 
 # Execute this file to run a LED strand test
