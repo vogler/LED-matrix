@@ -6,6 +6,7 @@ UDP_IP = 'wled-matrix'
 UDP_PORT = 21324
 W = 16
 H = 16
+MQTT_BROKER = 'localhost'
 MQTT_TOPIC = 'lights/wled-matrix'
 MQTT_CO2_TOPIC = 'sensors/mh-z19b'
 
@@ -143,7 +144,7 @@ def color_mask(color, m, bg=None):
 
 # show a number n at position x, y with spacing between digits and rotating colors
 # x=0 is ltr, x=-1 is rtl starting at x=15; default colors without the first (black)
-def show_number(n, x=-2, y=1, spacing=1, colors=list(colors.values())[1:], bg=None):
+def show_number(n, x=-2, y=5, spacing=1, colors=list(colors.values())[1:], bg=colors['black']):
     ds = [int(c) for c in str(n)]
     dl = len(digits[0][0])
     dw = dl + spacing
@@ -163,6 +164,7 @@ def is_on():
     return requests.get('http://wled-matrix/json/state').json()['on']
 
 def set_on(on): # doc says "t" should toggle, but does not work (also their curl example) -> only bool
+    if type(on) is str: on = on == 'on' # on -> True | _ -> False
     requests.post('http://wled-matrix/json/state', json = {'on': on})
 
 def usage():
@@ -185,9 +187,23 @@ def on_message(client, userdata, msg):
         co2 = json.loads(msg.payload)['co2']
         print('co2:', co2)
         mutex.acquire()
-        show_number(co2, y=5, bg=colors['black'])
+        show_number(co2)
         update()
         mutex.release()
+    if msg.topic == MQTT_TOPIC:
+        m = msg.payload.decode('utf-8')
+        client.unsubscribe(MQTT_CO2_TOPIC)
+        print(m)
+        if m in ['on', 'off']:
+            set_on(m)
+        elif m.startswith('num '):
+            mutex.acquire()
+            show_number(int(m.split()[1]))
+            mutex.release()
+        elif m == 'co2':
+            client.subscribe(MQTT_CO2_TOPIC)
+        else:
+            print('MQTT: unhandled payload', m)
 
 client = mqtt.Client()
 client.on_connect = lambda client, userdata, flags, rc: print("Connected to MQTT (code %d) " % rc)
@@ -211,9 +227,9 @@ if __name__ == '__main__':
             show_number(num)
             while True:
                 update()
-        elif cmd == 'co2':
-            client.connect("localhost")
-            client.subscribe(MQTT_CO2_TOPIC)
+        elif cmd == 'co2' or cmd == 'mqtt':
+            client.connect(MQTT_BROKER)
+            client.subscribe(MQTT_CO2_TOPIC if cmd == 'co2' else MQTT_TOPIC)
             # client.loop_forever() # blocks, but co2 comes only every 10s, w/o update() WLED goes back to normal mode
             client.loop_start() # starts a thread
             while True:
