@@ -121,23 +121,29 @@ colors = {
     "yellow": [255, 255, 0],
 }
 
-def render(p, x, y):
+# place RGB pixels p at position x, y
+def place(p, x, y):
     global pixels
     for py in range(len(p)):
         for px in range(len(p[0])):
             if p[py][px]:
                 pixels[y+py, x+px] = p[py][px]
 
-def color_mask(color, p, bg=None):
+# color a mask m (entries 0 or 1), bg is optional background fill color
+def color_mask(color, m, bg=None):
     o = {}
-    for y in range(len(p)):
+    for y in range(len(m)):
         o[y] = {}
-        for x in range(len(p[0])):
-            o[y][x] = color if p[y][x] == 1 else bg
+        for x in range(len(m[0])):
+            o[y][x] = color if m[y][x] == 1 else bg
     return o
 
-def show_number(n, x=-2, y=1, spacing=1, colors=list(colors.values())[1:]): # x=0 is ltr, x=-1 is rtl starting at x=15; default colors without the first (black)
-    ds = [int(c) for c in str(n)] 
+# example: place(color_mask(colors["red"], digits[4]), 1, 1)
+
+# show a number n at position x, y with spacing between digits and rotating colors
+# x=0 is ltr, x=-1 is rtl starting at x=15; default colors without the first (black)
+def show_number(n, x=-2, y=1, spacing=1, colors=list(colors.values())[1:]):
+    ds = [int(c) for c in str(n)]
     dl = len(digits[0][0])
     dw = dl + spacing
     if x < 0:
@@ -146,9 +152,8 @@ def show_number(n, x=-2, y=1, spacing=1, colors=list(colors.values())[1:]): # x=
         ds.reverse()
         colors.reverse()
     for i in range(len(ds)):
-        p = color_mask(colors[i], digits[ds[i]])
-        print(dw, x, x+i*dw)
-        render(p, x+i*dw, y)
+        p = color_mask(colors[i%len(colors)], digits[ds[i]])
+        place(p, x+i*dw, y)
 
 # https://kno.wled.ge/interfaces/mqtt/ subscribe to brightness changes (>0 is on): mosquitto_sub -t wled/matrix/g
 # https://kno.wled.ge/interfaces/json-api/
@@ -156,22 +161,39 @@ import requests
 def is_on():
     return requests.get('http://wled-matrix/json/state').json()['on']
 
-def set_on(on):
+def set_on(on): # doc says "t" should toggle, but does not work (also their curl example) -> only bool
     requests.post('http://wled-matrix/json/state', json = {'on': on})
 
+def usage():
+    print('usage: python3 %s [cmd]' % sys.argv[0])
+    print('[cmd]:')
+    print('\ton|off\tturn on/off')
+    print('\tnum [n]\tshow number n in colors until killed')
+    quit(1)
+
 if __name__ == '__main__':
-    was_on = is_on()
-    print('was_on', was_on)
-    try:
-        if not was_on: set_on(True)
-        # render(color_mask(colors["red"],     digits[1]), 0, 1)
-        # render(color_mask(colors["green"],   digits[2]), 4, 1)
-        # render(color_mask(colors["blue"],    digits[3]), 8, 1)
-        # render(color_mask(colors["yellow"],  digits[4]), 12, 1)
-        show_number(1234)
-        while True:
-            update()
-    finally:
-        if not was_on:
-            time.sleep(1) # give time to process last UDP packets, otherwise it does not turn off
-            set_on(False)
+    import sys
+    argc = len(sys.argv)
+    if argc < 2: usage()
+    cmd = sys.argv[1].lower()
+    if cmd in ['on', 'off']:
+        set_on(cmd == 'on')
+    elif cmd == 'num':
+        if argc != 3: usage()
+        num = int(sys.argv[2])
+        was_on = is_on()
+        print('was_on', was_on)
+        try:
+            if not was_on: set_on(True)
+            show_number(num)
+            while True:
+                update()
+        except KeyboardInterrupt:
+            print('exit')
+        finally:
+            if not was_on:
+                time.sleep(1) # give time to process last UDP packets, otherwise it does not turn off
+                set_on(False)
+                print('turned off again')
+    else:
+        usage()
