@@ -4,17 +4,18 @@
 # inlined from config.py
 UDP_IP = 'wled-matrix'
 UDP_PORT = 21324
-w = 16
-h = 16
-n = w*h
+W = 16
+H = 16
+MQTT_TOPIC = 'lights/wled-matrix'
+MQTT_CO2_TOPIC = 'sensors/mh-z19b'
 
 import time
 import numpy as np
 import socket
 _sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-pixels = np.full((h,w,3), 0, np.uint8)
-_prev_pixels = np.copy(pixels)
+pixels = np.full((H,W,3), 0, np.uint8)
+prev_pixels = np.copy(pixels)
 
 def update():
     """Sends UDP packets to ESP8266 to update LED strip values
@@ -27,8 +28,8 @@ def update():
         g (0 to 255): Green value of LED
         b (0 to 255): Blue value of LED
     """
-    global pixels, _prev_pixels
-    idx = [(y,x) for y in range(h) for x in range(w) if (pixels[y,x] != _prev_pixels[y,x]).any()] # indices where value changed
+    global pixels, prev_pixels
+    idx = [(y,x) for y in range(H) for x in range(W) if (pixels[y,x] != prev_pixels[y,x]).any()] # indices where value changed
     MAX_PIXELS_PER_PACKET = 126
     n_packets = len(idx) // MAX_PIXELS_PER_PACKET + 1
     packets = np.array_split(idx, n_packets)
@@ -39,11 +40,11 @@ def update():
         m.append(2) # wait 2s after the last received packet before returning to normal mode
         for (y,x) in idx:
             # zig-zag layout: 0 starts top left going down but then second column goes up
-            index = x*h + (h-1-y if x%2 else y)
+            index = x*H + (H-1-y if x%2 else y)
             m.append(index)
             m.extend(pixels[y,x]) # RGB values
         _sock.sendto(bytes(m), (UDP_IP, UDP_PORT))
-    _prev_pixels = np.copy(pixels)
+    prev_pixels = np.copy(pixels)
 
 # Scrolls a red, green, and blue pixel across the LED matrix continuously
 def strand():
@@ -101,7 +102,7 @@ digits[7] = [[1,1,1],
              [0,0,1],
              [0,1,0],
              [0,1,0],
-             [1,0,0]]
+             [0,1,0]]
 digits[8] = [[1,1,1],
              [1,0,1],
              [1,1,1],
@@ -142,17 +143,17 @@ def color_mask(color, m, bg=None):
 
 # show a number n at position x, y with spacing between digits and rotating colors
 # x=0 is ltr, x=-1 is rtl starting at x=15; default colors without the first (black)
-def show_number(n, x=-2, y=1, spacing=1, colors=list(colors.values())[1:]):
+def show_number(n, x=-2, y=1, spacing=1, colors=list(colors.values())[1:], bg=None):
     ds = [int(c) for c in str(n)]
     dl = len(digits[0][0])
     dw = dl + spacing
     if x < 0:
-        x += w - dl+1
+        x += W - dl+1
         dw *= -1
         ds.reverse()
-        colors.reverse()
+        colors = list(reversed(colors)) # .reverse() mutates through!
     for i in range(len(ds)):
-        p = color_mask(colors[i%len(colors)], digits[ds[i]])
+        p = color_mask(colors[i%len(colors)], digits[ds[i]], bg)
         place(p, x+i*dw, y)
 
 # https://kno.wled.ge/interfaces/mqtt/ subscribe to brightness changes (>0 is on): mosquitto_sub -t wled/matrix/g
@@ -169,31 +170,63 @@ def usage():
     print('[cmd]:')
     print('\ton|off\tturn on/off')
     print('\tnum [n]\tshow number n in colors until killed')
+    print('\tco2\tshow co2 level updated via MQTT in colors until killed')
+    print('\tmqtt\tsubscribe to %s for the above commands' % MQTT_TOPIC)
     quit(1)
+
+import paho.mqtt.client as mqtt
+import json
+from threading import Lock
+mutex = Lock() # protect pixels, otherwise we get races updating them
+
+def on_message(client, userdata, msg):
+    # print(msg.topic, str(msg.payload))
+    if msg.topic == MQTT_CO2_TOPIC:
+        co2 = json.loads(msg.payload)['co2']
+        print('co2:', co2)
+        mutex.acquire()
+        show_number(co2, y=5, bg=colors['black'])
+        update()
+        mutex.release()
+
+client = mqtt.Client()
+client.on_connect = lambda client, userdata, flags, rc: print("Connected to MQTT (code %d) " % rc)
+client.on_message = on_message
 
 if __name__ == '__main__':
     import sys
     argc = len(sys.argv)
     if argc < 2: usage()
     cmd = sys.argv[1].lower()
-    if cmd in ['on', 'off']:
-        set_on(cmd == 'on')
-    elif cmd == 'num':
-        if argc != 3: usage()
-        num = int(sys.argv[2])
-        was_on = is_on()
-        print('was_on', was_on)
-        try:
-            if not was_on: set_on(True)
+    was_on = is_on()
+    print('was_on', was_on)
+    should_be_on = cmd != 'off'
+    if was_on != should_be_on: set_on(should_be_on)
+    try:
+        if cmd in ['on', 'off']:
+            pass
+        elif cmd == 'num':
+            if argc != 3: usage()
+            num = int(sys.argv[2])
             show_number(num)
             while True:
                 update()
-        except KeyboardInterrupt:
-            print('exit')
-        finally:
-            if not was_on:
-                time.sleep(1) # give time to process last UDP packets, otherwise it does not turn off
-                set_on(False)
-                print('turned off again')
-    else:
-        usage()
+        elif cmd == 'co2':
+            client.connect("localhost")
+            client.subscribe(MQTT_CO2_TOPIC)
+            # client.loop_forever() # blocks, but co2 comes only every 10s, w/o update() WLED goes back to normal mode
+            client.loop_start() # starts a thread
+            while True:
+                mutex.acquire()
+                update()
+                mutex.release()
+                time.sleep(1)
+        else:
+            usage()
+    except KeyboardInterrupt:
+        print('exit')
+    finally:
+        if not was_on and cmd in ['num', 'co2']:
+            time.sleep(1) # give time to process last UDP packets, otherwise it does not turn off
+            set_on(False)
+            print('turned off again')
