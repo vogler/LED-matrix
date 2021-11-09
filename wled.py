@@ -47,10 +47,15 @@ def update():
         _sock.sendto(bytes(m), (UDP_IP, UDP_PORT))
     prev_pixels = np.copy(pixels)
 
+def clear():
+    global pixels
+    pixels *= 0 # Turn all pixels off
+    update()
+
 # Scrolls a red, green, and blue pixel across the LED matrix continuously
 def strand():
     global pixels
-    pixels *= 0 # Turn all pixels off
+    clear()
     pixels[0, 0] = [255, 0, 0] # red
     pixels[1, 0] = [0, 255, 0] # green
     pixels[2, 0] = [0, 0, 255] # blue
@@ -180,30 +185,39 @@ import paho.mqtt.client as mqtt
 import json
 from threading import Lock
 mutex = Lock() # protect pixels, otherwise we get races updating them
+is_showing = False
 
 def on_message(client, userdata, msg):
+    global is_showing
     # print(msg.topic, str(msg.payload))
+    mutex.acquire()
     if msg.topic == MQTT_CO2_TOPIC:
         co2 = json.loads(msg.payload)['co2']
         print('co2:', co2)
-        mutex.acquire()
-        show_number(co2)
+        if is_showing: show_number(co2)
         update()
-        mutex.release()
     if msg.topic == MQTT_TOPIC:
         m = msg.payload.decode('utf-8')
         client.unsubscribe(MQTT_CO2_TOPIC)
-        print(m)
+        print('MQTT cmd:', m)
+        is_showing = False
         if m in ['on', 'off']:
+            time.sleep(1) # TODO better solution
+            clear()
             set_on(m)
         elif m.isnumeric():
-            mutex.acquire()
+            set_on(True)
+            is_showing = True
             show_number(int(m))
-            mutex.release()
         elif m == 'co2':
+            time.sleep(1) # TODO better solution
+            clear()
+            set_on(True)
+            is_showing = True
             client.subscribe(MQTT_CO2_TOPIC)
         else:
             print('MQTT: unhandled payload', m)
+    mutex.release()
 
 client = mqtt.Client()
 client.on_connect = lambda client, userdata, flags, rc: print("Connected to MQTT (code %d) " % rc)
@@ -216,8 +230,8 @@ if __name__ == '__main__':
     cmd = sys.argv[1].lower()
     was_on = is_on()
     print('was_on', was_on)
-    should_be_on = cmd != 'off'
-    if was_on != should_be_on: set_on(should_be_on)
+    should_be_on = cmd != 'cmd'
+    if was_on != should_be_on and cmd != 'mqtt': set_on(should_be_on)
     try:
         if cmd in ['on', 'off']:
             pass
@@ -228,13 +242,16 @@ if __name__ == '__main__':
             while True:
                 update()
         elif cmd == 'co2' or cmd == 'mqtt':
+            if cmd == 'co2': is_showing = True
             client.connect(MQTT_BROKER)
             client.subscribe(MQTT_CO2_TOPIC if cmd == 'co2' else MQTT_TOPIC)
             # client.loop_forever() # blocks, but co2 comes only every 10s, w/o update() WLED goes back to normal mode
             client.loop_start() # starts a thread
             while True:
                 mutex.acquire()
-                update()
+                if is_showing:
+                    update()
+                    # print('updated')
                 mutex.release()
                 time.sleep(1)
         else:
@@ -242,7 +259,8 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print('exit')
     finally:
-        if not was_on and cmd in ['num', 'co2']:
+        if not was_on and cmd in ['num', 'co2', 'mqtt']:
+            update()
             time.sleep(1) # give time to process last UDP packets, otherwise it does not turn off
             set_on(False)
             print('turned off again')
