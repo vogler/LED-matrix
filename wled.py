@@ -67,11 +67,11 @@ digits[0] = [[1,1,1],
              [1,0,1],
              [1,0,1],
              [1,1,1]]
-digits[1] = [[0,1,0],
-             [0,1,0],
-             [0,1,0],
-             [0,1,0],
-             [0,1,0]]
+digits[1] = [[0,0,1],
+             [0,1,1],
+             [0,0,1],
+             [0,0,1],
+             [0,0,1]]
 digits[2] = [[1,1,1],
              [0,0,1],
              [1,1,1],
@@ -136,6 +136,20 @@ def color_mask(color, p, bg=None):
             o[y][x] = color if p[y][x] == 1 else bg
     return o
 
+def show_number(n, x=-2, y=1, spacing=1, colors=list(colors.values())[1:]): # x=0 is ltr, x=-1 is rtl starting at x=15; default colors without the first (black)
+    ds = [int(c) for c in str(n)] 
+    dl = len(digits[0][0])
+    dw = dl + spacing
+    if x < 0:
+        x += w - dl+1
+        dw *= -1
+        ds.reverse()
+        colors.reverse()
+    for i in range(len(ds)):
+        p = color_mask(colors[i], digits[ds[i]])
+        print(dw, x, x+i*dw)
+        render(p, x+i*dw, y)
+
 # https://kno.wled.ge/interfaces/mqtt/ subscribe to brightness changes (>0 is on): mosquitto_sub -t wled/matrix/g
 # https://kno.wled.ge/interfaces/json-api/
 import requests
@@ -150,10 +164,11 @@ if __name__ == '__main__':
     print('was_on', was_on)
     try:
         if not was_on: set_on(True)
-        render(color_mask(colors["red"],     digits[1]), 1, 1)
-        render(color_mask(colors["green"],   digits[2]), 4, 1)
-        render(color_mask(colors["blue"],    digits[3]), 8, 1)
-        render(color_mask(colors["yellow"],  digits[4]), 12, 1)
+        # render(color_mask(colors["red"],     digits[1]), 0, 1)
+        # render(color_mask(colors["green"],   digits[2]), 4, 1)
+        # render(color_mask(colors["blue"],    digits[3]), 8, 1)
+        # render(color_mask(colors["yellow"],  digits[4]), 12, 1)
+        show_number(1234)
         while True:
             update()
     finally:
