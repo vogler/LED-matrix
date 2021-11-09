@@ -8,6 +8,7 @@ w = 16
 h = 16
 n = w*h
 
+import time
 import numpy as np
 import socket
 _sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -46,7 +47,6 @@ def update():
 
 # Scrolls a red, green, and blue pixel across the LED matrix continuously
 def strand():
-    import time
     global pixels
     pixels *= 0 # Turn all pixels off
     pixels[0, 0] = [255, 0, 0] # red
@@ -136,10 +136,27 @@ def color_mask(color, p, bg=None):
             o[y][x] = color if p[y][x] == 1 else bg
     return o
 
+# https://kno.wled.ge/interfaces/mqtt/ subscribe to brightness changes (>0 is on): mosquitto_sub -t wled/matrix/g
+# https://kno.wled.ge/interfaces/json-api/
+import requests
+def is_on():
+    return requests.get('http://wled-matrix/json/state').json()['on']
+
+def set_on(on):
+    requests.post('http://wled-matrix/json/state', json = {'on': on})
+
 if __name__ == '__main__':
-    render(color_mask(colors["red"],     digits[1]), 1, 1)
-    render(color_mask(colors["green"],   digits[2]), 4, 1)
-    render(color_mask(colors["blue"],    digits[3]), 8, 1)
-    render(color_mask(colors["yellow"],  digits[4]), 12, 1)
-    while True:
-        update()
+    was_on = is_on()
+    print('was_on', was_on)
+    try:
+        if not was_on: set_on(True)
+        render(color_mask(colors["red"],     digits[1]), 1, 1)
+        render(color_mask(colors["green"],   digits[2]), 4, 1)
+        render(color_mask(colors["blue"],    digits[3]), 8, 1)
+        render(color_mask(colors["yellow"],  digits[4]), 12, 1)
+        while True:
+            update()
+    finally:
+        if not was_on:
+            time.sleep(1) # give time to process last UDP packets, otherwise it does not turn off
+            set_on(False)
