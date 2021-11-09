@@ -44,10 +44,10 @@ def update():
         _sock.sendto(bytes(m), (UDP_IP, UDP_PORT))
     _prev_pixels = np.copy(pixels)
 
-# Execute this file to run a LED strand test.
-# You should see a red, green, and blue pixel scroll across the LED strip continuously.
-if __name__ == '__main__':
+# Scrolls a red, green, and blue pixel across the LED matrix continuously
+def strand():
     import time
+    global pixels
     pixels *= 0 # Turn all pixels off
     pixels[0, 0] = [255, 0, 0] # red
     pixels[1, 0] = [0, 255, 0] # green
@@ -59,3 +59,87 @@ if __name__ == '__main__':
         i = (i+1) % 256
         update()
         time.sleep(.05)
+
+
+digits = {}
+digits[0] = [[1,1,1],
+             [1,0,1],
+             [1,0,1],
+             [1,0,1],
+             [1,1,1]]
+digits[1] = [[0,1,0],
+             [0,1,0],
+             [0,1,0],
+             [0,1,0],
+             [0,1,0]]
+digits[2] = [[1,1,1],
+             [0,0,1],
+             [1,1,1],
+             [1,0,0],
+             [1,1,1]]
+digits[3] = [[1,1,1],
+             [0,0,1],
+             [1,1,1],
+             [0,0,1],
+             [1,1,1]]
+digits[4] = [[1,0,1],
+             [1,0,1],
+             [1,1,1],
+             [0,0,1],
+             [0,0,1]]
+digits[5] = [[1,1,1],
+             [1,0,0],
+             [1,1,1],
+             [0,0,1],
+             [1,1,1]]
+digits[6] = [[1,1,1],
+             [1,0,0],
+             [1,1,1],
+             [1,0,1],
+             [1,1,1]]
+digits[7] = [[1,1,1],
+             [0,0,1],
+             [0,1,0],
+             [0,1,0],
+             [1,0,0]]
+digits[8] = [[1,1,1],
+             [1,0,1],
+             [1,1,1],
+             [1,0,1],
+             [1,1,1]]
+digits[9] = [[1,1,1],
+             [1,0,1],
+             [1,1,1],
+             [0,0,1],
+             [1,1,1]]
+
+colors = {
+    "black":  [0, 0, 0],
+    "red":    [255, 0, 0],
+    "green":  [0, 255, 0],
+    "blue":   [0, 0, 255],
+    "yellow": [255, 255, 0],
+}
+
+def render(p, x, y):
+    global pixels
+    for py in range(len(p)):
+        for px in range(len(p[0])):
+            if p[py][px]:
+                pixels[y+py, x+px] = p[py][px]
+
+def color_mask(color, p, bg=None):
+    o = {}
+    for y in range(len(p)):
+        o[y] = {}
+        for x in range(len(p[0])):
+            o[y][x] = color if p[y][x] == 1 else bg
+    return o
+
+if __name__ == '__main__':
+    render(color_mask(colors["red"],     digits[1]), 1, 1)
+    render(color_mask(colors["green"],   digits[2]), 4, 1)
+    render(color_mask(colors["blue"],    digits[3]), 8, 1)
+    render(color_mask(colors["yellow"],  digits[4]), 12, 1)
+    while True:
+        update()
