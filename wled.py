@@ -1,20 +1,17 @@
 # based on https://github.com/scottlawsonbc/audio-reactive-led-strip/blob/master/python/led.py
 # via https://kno.wled.ge/interfaces/udp-realtime/#setup-with-arls
-import numpy as np
 
 # inlined from config.py
-UDP_IP = '192.168.178.100'
+UDP_IP = 'wled-matrix'
 UDP_PORT = 21324
 N_PIXELS = 256
 
+import numpy as np
 import socket
 _sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-_prev_pixels = np.tile(253, (3, N_PIXELS))
-"""Pixel values that were most recently displayed on the LED strip"""
-
 pixels = np.tile(1, (3, N_PIXELS))
-"""Pixel values for the LED strip"""
+_prev_pixels = np.tile(253, (3, N_PIXELS))
 
 def update():
     """Sends UDP packets to ESP8266 to update LED strip values
@@ -28,30 +25,27 @@ def update():
         b (0 to 255): Blue value of LED
     """
     global pixels, _prev_pixels
-    # Truncate values and cast to integer
-    pixels = np.clip(pixels, 0, 255).astype(int)
-    p = pixels
+    pixels = np.clip(pixels, 0, 255).astype(int) # truncate values and cast to integer
+    idx = range(pixels.shape[1]) # pixel indices
+    idx = [i for i in idx if not np.array_equal(pixels[:, i], _prev_pixels[:, i])] # indices where value changed
     MAX_PIXELS_PER_PACKET = 126
-    # Pixel indices
-    idx = range(pixels.shape[1])
-    idx = [i for i in idx if not np.array_equal(p[:, i], _prev_pixels[:, i])]
     n_packets = len(idx) // MAX_PIXELS_PER_PACKET + 1
     idx = np.array_split(idx, n_packets)
     for packet_indices in idx:
         m = []
-        m.append(1)
-        m.append(2)
+        # packet header: https://kno.wled.ge/interfaces/udp-realtime/#udp-realtime
+        m.append(1) # protocol: WARLS (WLED Audio-Reactive-Led-Strip)
+        m.append(2) # wait 2s after the last received packet before returning to normal mode
         for i in packet_indices:
             m.append(i)  # Index of pixel to change
-            m.append(p[0][i])  # Pixel red value
-            m.append(p[1][i])  # Pixel green value
-            m.append(p[2][i])  # Pixel blue value
+            m.append(pixels[0][i])  # Pixel red value
+            m.append(pixels[1][i])  # Pixel green value
+            m.append(pixels[2][i])  # Pixel blue value
         _sock.sendto(bytes(m), (UDP_IP, UDP_PORT))
-    _prev_pixels = np.copy(p)
+    _prev_pixels = np.copy(pixels)
 
-# Execute this file to run a LED strand test
-# If everything is working, you should see a red, green, and blue pixel scroll
-# across the LED strip continuously
+# Execute this file to run a LED strand test.
+# You should see a red, green, and blue pixel scroll across the LED strip continuously.
 if __name__ == '__main__':
     import time
     # Turn all pixels off
