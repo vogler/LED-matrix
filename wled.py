@@ -50,7 +50,6 @@ def update():
 def clear():
     global pixels
     pixels *= 0 # Turn all pixels off
-    update()
 
 # Scrolls a red, green, and blue pixel across the LED matrix continuously
 def strand():
@@ -194,6 +193,7 @@ def on_message(client, userdata, msg):
     if msg.topic == MQTT_CO2_TOPIC:
         co2 = json.loads(msg.payload)['co2']
         print('co2:', co2)
+        clear() # TODO only needed if the number of digits changes...
         if is_showing: show_number(co2)
         update()
     if msg.topic == MQTT_TOPIC:
@@ -201,6 +201,7 @@ def on_message(client, userdata, msg):
         client.unsubscribe(MQTT_CO2_TOPIC)
         print('MQTT cmd:', m)
         is_showing = False
+        if m == '0': m = 'off'
         if m in ['on', 'off']:
             time.sleep(1) # TODO better solution
             clear()
@@ -246,7 +247,7 @@ if __name__ == '__main__':
             client.connect(MQTT_BROKER)
             client.subscribe(MQTT_CO2_TOPIC if cmd == 'co2' else MQTT_TOPIC)
             # client.loop_forever() # blocks, but co2 comes only every 10s, w/o update() WLED goes back to normal mode
-            client.loop_start() # starts a thread
+            client.loop_start() # starts a thread; could also use client.loop() below, but not as responsive.
             while True:
                 mutex.acquire()
                 if is_showing:
