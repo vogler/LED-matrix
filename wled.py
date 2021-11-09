@@ -173,7 +173,7 @@ def usage():
     print('\ton|off\tturn on/off')
     print('\tnum [n]\tshow number n in colors until killed')
     print('\tco2\tshow co2 level updated via MQTT in colors until killed')
-    print('\tmqtt\tsubscribe to %s for the above commands' % MQTT_TOPIC)
+    print('\tmqtt\tsubscribe to %s for the above commands (numeric payload for num)' % MQTT_TOPIC)
     quit(1)
 
 import paho.mqtt.client as mqtt
@@ -196,9 +196,9 @@ def on_message(client, userdata, msg):
         print(m)
         if m in ['on', 'off']:
             set_on(m)
-        elif m.startswith('num '):
+        elif m.isnumeric():
             mutex.acquire()
-            show_number(int(m.split()[1]))
+            show_number(int(m))
             mutex.release()
         elif m == 'co2':
             client.subscribe(MQTT_CO2_TOPIC)
