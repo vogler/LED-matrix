@@ -5,6 +5,7 @@
 ### Log
 <details>
   <summary>Click to expand</summary>
+
 01.03.22 Created this repo and [extracted commits](https://www.pixelite.co.nz/article/extracting-file-folder-from-git-repository-with-full-git-history/) from [smart-home](https://github.com/vogler/smart-home/search?q=wled&type=commits):
 ```console
 $ cd smart-home
