@@ -17,7 +17,7 @@ Beware of warping (visible in top right corner below).
 ![image](https://user-images.githubusercontent.com/493741/156219889-854490f8-e715-45d4-9400-5dd8a94ac959.png)
 ![image](https://user-images.githubusercontent.com/493741/156219938-665f8553-356a-4c82-9fce-6b1e8f622a15.png)
 
-More well-documented projects are mentioned [here](https://www.mydealz.de/comments/permalink/36838747).
+More well-documented projects are mentioned [here in german](https://www.mydealz.de/comments/permalink/36838747) and at https://github.com/2dom/PxMatrix#examples.
 
 ### TODO
 - [ ] have some endpoint for animations, .gif upload etc.
