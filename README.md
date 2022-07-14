@@ -1,6 +1,8 @@
 # LED-matrix
 16x16 pixel RGB LED matrix with support for [WLED](https://github.com/Aircoookie/WLED) and text (digits only for now).
 
+Price for components was about 18€ (see [comment](https://www.mydealz.de/deals/divoom-pixoo-pixelart-display-16x16-nft-foto-frame-inkl-akku-1954933#comment-35482339)).
+
 Use WLED and its interfaces for controlling the light and showing effects.
 To show digits (which WLED can't), see `wled.py` which sends pixel information to WLED via UDP.
 
@@ -15,6 +17,10 @@ Beware of warping (visible in top right corner below).
 ![image](https://user-images.githubusercontent.com/493741/156219889-854490f8-e715-45d4-9400-5dd8a94ac959.png)
 ![image](https://user-images.githubusercontent.com/493741/156219938-665f8553-356a-4c82-9fce-6b1e8f622a15.png)
 
+More well-documented projects are mentioned [here](https://www.mydealz.de/comments/permalink/36838747).
+
+### TODO
+- [ ] have some endpoint for animations, .gif upload etc.
 
 ### Log
 <details>
