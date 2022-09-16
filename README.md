@@ -1,4 +1,5 @@
 # LED-matrix
+
 16x16 pixel RGB LED matrix with support for [WLED](https://github.com/Aircoookie/WLED) and text (digits only for now).
 
 Price for components was about 18€ (see [comment](https://www.mydealz.de/deals/divoom-pixoo-pixelart-display-16x16-nft-foto-frame-inkl-akku-1954933#comment-35482339)).
@@ -20,7 +21,9 @@ Beware of warping (visible in top right corner below).
 More well-documented projects are mentioned [here in german](https://www.mydealz.de/comments/permalink/36838747) and at https://github.com/2dom/PxMatrix#examples.
 
 ### TODO
-- [ ] have some endpoint for animations, .gif upload etc.
+- [ ] endpoint for animations, .gif upload etc.
+  - via [WLED: Scrolling Text Feature](https://github.com/Aircoookie/WLED/issues/1207#issuecomment-1193900656):
+    Webserver to upload and display jpeg: [webserver_jpeg_ws2812.ino](https://github.com/datasith/Ai_Demos_ESP8266/blob/master/webserver_jpeg_ws2812/webserver_jpeg_ws2812.ino)
 
 ### Log
 <details>
