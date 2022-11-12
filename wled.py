@@ -164,12 +164,25 @@ def show_number(n, x=-2, y=5, spacing=1, colors=list(colors.values())[1:], bg=co
 # https://kno.wled.ge/interfaces/mqtt/ subscribe to brightness changes (>0 is on): mosquitto_sub -t wled/matrix/g
 # https://kno.wled.ge/interfaces/json-api/
 import requests
+# https://stackoverflow.com/questions/15431044/can-i-set-max-retries-for-requests-request
+from requests.adapters import HTTPAdapter, Retry
+s = requests.Session()
+retries = Retry(total=5, backoff_factor=0.2)
+s.mount('http://', HTTPAdapter(max_retries=retries))
+
 def is_on():
-    return requests.get(f'http://{HOST}/json/state').json()['on']
+    try:
+        return requests.get(f'http://{HOST}/json/state').json()['on']
+    except Exception as e:
+        print('is_on failed:', e)
+        return False
 
 def set_on(on): # doc says "t" should toggle, but does not work (also their curl example) -> only bool
     if type(on) is str: on = on == 'on' # on -> True | _ -> False
-    requests.post(f'http://{HOST}/json/state', json = {'on': on})
+    try:
+        requests.post(f'http://{HOST}/json/state', json = {'on': on})
+    except Exception as e:
+        print('set_on failed:', e)
 
 def usage():
     print('usage: python3 %s [cmd]' % sys.argv[0])
