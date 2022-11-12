@@ -2,10 +2,10 @@
 # via https://kno.wled.ge/interfaces/udp-realtime/#setup-with-arls
 
 # inlined from config.py
-UDP_IP = 'wled-matrix'
+HOST = 'wled-matrix'
 UDP_PORT = 21324
-W = 16
-H = 16
+W = 16 # width pixels
+H = 16 # height pixels
 MQTT_BROKER = 'localhost'
 MQTT_TOPIC = 'lights/wled-matrix'
 MQTT_CO2_TOPIC = 'sensors/mh-z19b'
@@ -44,7 +44,7 @@ def update():
             index = x*H + (H-1-y if x%2 else y)
             m.append(index)
             m.extend(pixels[y,x]) # RGB values
-        _sock.sendto(bytes(m), (UDP_IP, UDP_PORT))
+        _sock.sendto(bytes(m), (HOST, UDP_PORT))
     prev_pixels = np.copy(pixels)
 
 def clear():
@@ -165,11 +165,11 @@ def show_number(n, x=-2, y=5, spacing=1, colors=list(colors.values())[1:], bg=co
 # https://kno.wled.ge/interfaces/json-api/
 import requests
 def is_on():
-    return requests.get('http://wled-matrix/json/state').json()['on']
+    return requests.get(f'http://{HOST}/json/state').json()['on']
 
 def set_on(on): # doc says "t" should toggle, but does not work (also their curl example) -> only bool
     if type(on) is str: on = on == 'on' # on -> True | _ -> False
-    requests.post('http://wled-matrix/json/state', json = {'on': on})
+    requests.post(f'http://{HOST}/json/state', json = {'on': on})
 
 def usage():
     print('usage: python3 %s [cmd]' % sys.argv[0])
