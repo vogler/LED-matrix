@@ -9,6 +9,7 @@ H = 16 # height pixels
 MQTT_BROKER = 'localhost'
 MQTT_TOPIC = 'lights/wled-matrix'
 MQTT_CO2_TOPIC = 'sensors/mh-z19b'
+MQTT_TH_TOPIC = 'sensors/bme280'
 
 import time
 import numpy as np
@@ -78,6 +79,11 @@ digits[1] = [[0,0,1],
              [0,0,1],
              [0,0,1],
              [0,0,1]]
+digits[1] = [[0,1,0],
+             [1,1,0],
+             [0,1,0],
+             [0,1,0],
+             [1,1,1]]
 digits[2] = [[1,1,1],
              [0,0,1],
              [1,1,1],
@@ -120,11 +126,30 @@ digits[9] = [[1,1,1],
              [1,1,1]]
 
 colors = {
-    "black":  [0, 0, 0],
-    "red":    [255, 0, 0],
-    "yellow": [255, 255, 0],
-    "green":  [0, 255, 0],
-    "blue":   [0, 0, 255],
+    "black":   [0, 0, 0],
+    "red":     [255, 0, 0],
+    "yellow":  [255, 255, 0],
+    "lime":    [0, 255, 0],
+    "blue":    [0, 0, 255],
+    "cyan":    [0, 255, 255],
+    "magenta": [255, 0, 255],
+    "white":   [255, 255, 255],
+    # all the 128 variations are the same as above, just a little bit less bright
+    "gray":    [128, 128, 128],
+    "maroon":  [128, 0, 0],
+    "green":   [0, 128, 0],
+    "navy":    [0, 0, 128],
+    "olive":   [128, 128, 0],
+    "teal":    [0, 128, 128],
+    "purple":  [128, 0, 128],
+    # some inbetween colors
+    "orange":  [255, 165, 0],
+    "coral":   [255, 127, 80], # same as orange
+    "forest":  [34, 139, 34],
+    "cadet":   [95, 158, 160],
+    "steel":   [70, 130, 180],
+    "cornflower": [100, 149, 237],
+    "plum":    [221, 160, 221],
 }
 
 # place RGB pixels p at position x, y
@@ -156,9 +181,9 @@ def show_number(n, x=-2, y=5, spacing=1, colors=list(colors.values())[1:], bg=co
         x += W - dl+1
         dw *= -1
         ds.reverse()
-        colors = list(reversed(colors)) # .reverse() mutates through!
     for i in range(len(ds)):
-        p = color_mask(colors[i%len(colors)], digits[ds[i]], bg)
+        color = colors[(len(ds)-1-i)%len(colors)]
+        p = color_mask(color, digits[ds[i]], bg)
         place(p, x+i*dw, y)
 
 # https://kno.wled.ge/interfaces/mqtt/ subscribe to brightness changes (>0 is on): mosquitto_sub -t wled/matrix/g
@@ -190,6 +215,7 @@ def usage():
     print('\ton|off\tturn on/off')
     print('\tnum [n]\tshow number n in colors until killed')
     print('\tco2\tshow co2 level updated via MQTT in colors until killed')
+    print('\tco2th\tshow co2 level + temperature + humidity - updated via MQTT in colors until killed')
     print('\tmqtt\tsubscribe to %s for the above commands (numeric payload for num)' % MQTT_TOPIC)
     quit(1)
 
@@ -198,18 +224,39 @@ import json
 from threading import Lock
 mutex = Lock() # protect pixels, otherwise we get races updating them
 is_showing = False
+data = dict()
+cmd = ''
+
+def show_co2x():
+    global is_showing
+    global data
+    global cmd
+    clear() # TODO only needed if the number of digits changes...
+    if is_showing:
+        if cmd == 'co2':
+            show_number(data['co2'])
+        if cmd == 'co2th':
+            if 'co2' in data: show_number(data['co2'], y=2)
+            if 'temp' in data: show_number(round(data['temp']), y=9, x=0, colors=[colors['purple']])
+            if 'humi' in data: show_number(round(data['humi']), y=9, x=8, colors=[colors['teal']])
+    update()
 
 def on_message(client, userdata, msg):
     global is_showing
+    global data
     # print(msg.topic, str(msg.payload))
     mutex.acquire()
     if msg.topic == MQTT_CO2_TOPIC:
-        co2 = json.loads(msg.payload)['co2']
+        co2 = data['co2'] = json.loads(msg.payload)['co2']
         print('co2:', co2)
-        clear() # TODO only needed if the number of digits changes...
-        if is_showing: show_number(co2)
-        update()
-    if msg.topic == MQTT_TOPIC:
+        show_co2x()
+    elif msg.topic == MQTT_TH_TOPIC:
+        j = json.loads(msg.payload)
+        t = data['temp'] = j['temperature']
+        h = data['humi'] = j['humidity']
+        print('temp:', t, 'humi:', round(h, 2))
+        show_co2x()
+    elif msg.topic == MQTT_TOPIC:
         m = msg.payload.decode('utf-8')
         client.unsubscribe(MQTT_CO2_TOPIC)
         print('MQTT cmd:', m)
@@ -244,8 +291,8 @@ if __name__ == '__main__':
     cmd = sys.argv[1].lower()
     was_on = is_on()
     print('was_on', was_on)
-    should_be_on = cmd != 'cmd'
-    if was_on != should_be_on and cmd != 'mqtt': set_on(should_be_on)
+    should_be_on = cmd != 'off' and cmd != 'mqtt'
+    if was_on != should_be_on: set_on(should_be_on)
     try:
         if cmd in ['on', 'off']:
             pass
@@ -255,10 +302,16 @@ if __name__ == '__main__':
             show_number(num)
             while True:
                 update()
-        elif cmd == 'co2' or cmd == 'mqtt':
-            if cmd == 'co2': is_showing = True
+        elif cmd in ['co2', 'co2th', 'mqtt']:
+            if cmd != 'mqtt': is_showing = True
             client.connect(MQTT_BROKER)
-            client.subscribe(MQTT_CO2_TOPIC if cmd == 'co2' else MQTT_TOPIC)
+            if cmd == 'mqtt':
+                client.subscribe(MQTT_TOPIC)
+            elif cmd == 'co2':
+                client.subscribe(MQTT_CO2_TOPIC)
+            elif cmd == 'co2th':
+                client.subscribe(MQTT_CO2_TOPIC)
+                client.subscribe(MQTT_TH_TOPIC)
             # client.loop_forever() # blocks, but co2 comes only every 10s, w/o update() WLED goes back to normal mode
             client.loop_start() # starts a thread; could also use client.loop() below, but not as responsive.
             while True:
@@ -273,8 +326,8 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print('exit')
     finally:
-        if not was_on and cmd in ['num', 'co2', 'mqtt']:
+        if not was_on and cmd != 'on' and cmd != 'off':
             update()
-            time.sleep(1) # give time to process last UDP packets, otherwise it does not turn off
+            time.sleep(3) # give time to process last UDP packets, otherwise it does not turn off
             set_on(False)
             print('turned off again')
