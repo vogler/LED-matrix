@@ -225,24 +225,18 @@ from threading import Lock
 mutex = Lock() # protect pixels, otherwise we get races updating them
 is_showing = False
 data = dict()
-cmd = ''
 
 def show_co2x():
-    global is_showing
     global data
-    global cmd
     clear() # TODO only needed if the number of digits changes...
-    if is_showing:
-        if cmd == 'co2':
-            show_number(data['co2'])
-        if cmd == 'co2th':
-            if 'co2' in data: show_number(data['co2'], y=2)
-            if 'temp' in data: show_number(round(data['temp']), y=9, x=0, colors=[colors['purple']])
-            if 'humi' in data: show_number(round(data['humi']), y=9, x=8, colors=[colors['teal']])
-    update()
+    if data['cmd'] == 'co2':
+        show_number(data['co2'])
+    if data['cmd'] == 'co2th':
+        if 'co2' in data: show_number(data['co2'], y=2)
+        if 'temp' in data: show_number(round(data['temp']), y=9, x=0, colors=[colors['purple']])
+        if 'humi' in data: show_number(round(data['humi']), y=9, x=8, colors=[colors['teal']])
 
 def on_message(client, userdata, msg):
-    global is_showing
     global data
     # print(msg.topic, str(msg.payload))
     mutex.acquire()
@@ -259,23 +253,24 @@ def on_message(client, userdata, msg):
     elif msg.topic == MQTT_TOPIC:
         m = msg.payload.decode('utf-8')
         client.unsubscribe(MQTT_CO2_TOPIC)
+        client.unsubscribe(MQTT_TH_TOPIC)
         print('MQTT cmd:', m)
-        is_showing = False
+        time.sleep(1) # TODO better solution
+        clear()
         if m == '0': m = 'off'
+        data['cmd'] = m
         if m in ['on', 'off']:
-            time.sleep(1) # TODO better solution
-            clear()
             set_on(m)
         elif m.isnumeric():
             set_on(True)
-            is_showing = True
             show_number(int(m))
         elif m == 'co2':
-            time.sleep(1) # TODO better solution
-            clear()
             set_on(True)
-            is_showing = True
             client.subscribe(MQTT_CO2_TOPIC)
+        elif m == 'co2th':
+            set_on(True)
+            client.subscribe(MQTT_CO2_TOPIC)
+            client.subscribe(MQTT_TH_TOPIC)
         else:
             print('MQTT: unhandled payload', m)
     mutex.release()
@@ -288,7 +283,7 @@ if __name__ == '__main__':
     import sys
     argc = len(sys.argv)
     if argc < 2: usage()
-    cmd = sys.argv[1].lower()
+    cmd = data['cmd'] = sys.argv[1].lower()
     was_on = is_on()
     print('was_on', was_on)
     should_be_on = cmd != 'off' and cmd != 'mqtt'
@@ -303,7 +298,6 @@ if __name__ == '__main__':
             while True:
                 update()
         elif cmd in ['co2', 'co2th', 'mqtt']:
-            if cmd != 'mqtt': is_showing = True
             client.connect(MQTT_BROKER)
             if cmd == 'mqtt':
                 client.subscribe(MQTT_TOPIC)
@@ -316,9 +310,7 @@ if __name__ == '__main__':
             client.loop_start() # starts a thread; could also use client.loop() below, but not as responsive.
             while True:
                 mutex.acquire()
-                if is_showing:
-                    update()
-                    # print('updated')
+                update()
                 mutex.release()
                 time.sleep(1)
         else:
@@ -327,7 +319,8 @@ if __name__ == '__main__':
         print('exit')
     finally:
         if not was_on and cmd != 'on' and cmd != 'off':
+            clear()
             update()
-            time.sleep(3) # give time to process last UDP packets, otherwise it does not turn off
+            time.sleep(1) # give time to process last UDP packets, otherwise it does not turn off
             set_on(False)
             print('turned off again')
