@@ -24,6 +24,7 @@ More well-documented projects are mentioned [here in german](https://www.mydealz
 - [ ] endpoint for animations, .gif upload etc.
   - via [WLED: Scrolling Text Feature](https://github.com/Aircoookie/WLED/issues/1207#issuecomment-1193900656):
     Webserver to upload and display jpeg: [webserver_jpeg_ws2812.ino](https://github.com/datasith/Ai_Demos_ESP8266/blob/master/webserver_jpeg_ws2812/webserver_jpeg_ws2812.ino)
+  - [JS Pixel Art Editor](https://eloquentjavascript.net/19_paint.html)
 
 ### Log
 <details>
