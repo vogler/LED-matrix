@@ -36,4 +36,22 @@ $ git log --pretty=email --patch-with-stat --reverse --full-index --binary -- au
 $ cd ../LED-matrix
 $ git am < ../patch
 ```
+
+19.02.23 Was still commiting to `smart-home/wled.py` instead of here. Extracted new commits, deleted the file there and added this repo as a submodule.
+
+Also noticed that GitHub showed 'Mar 1, 2022' for all extracted commits.
+Reason was that AuthorDate was correct, but CommitDate was set to the time of amend operation. Normal `git log` shows AuthorDate, `git log --pretty=fuller` also shows CommitDate which is what GitHub uses.
+Fix was to use `git am --committer-date-is-author-date`. However, had to get rid of the commits with the wrong date first, and then redo:
+
+```
+$ cd ../smart-home
+$ git log --pretty=email --patch-with-stat --reverse --full-index --binary -- audio-reactive-led-strip wled.py > ../wled.patch
+$ # split it into wled1.patch (up to Nov 9 2021) and wled2.patch (from Nov 12 2022)
+$ cd ../LED-matrix
+$ git log --pretty=email --patch-with-stat --reverse --full-index --binary > ../led-matrix.patch
+$ # delete commits that are also in wled.patch from led-matrix.patch
+$ git reset b3d14b1f3fea1b708972e8da08000790efedad8c # go back to 'Initial commit'
+$ git am --committer-date-is-author-date < ../wled1.patch
+$ git am --committer-date-is-author-date < ../led-matrix.patch
+```
 </details>
