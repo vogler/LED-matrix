@@ -35,17 +35,20 @@ def update():
     MAX_PIXELS_PER_PACKET = 126
     n_packets = len(idx) // MAX_PIXELS_PER_PACKET + 1
     packets = np.array_split(idx, n_packets)
-    for idx in packets:
-        m = []
-        # packet header: https://kno.wled.ge/interfaces/udp-realtime/#udp-realtime
-        m.append(1) # protocol: WARLS (WLED Audio-Reactive-Led-Strip)
-        m.append(2) # wait 2s after the last received packet before returning to normal mode
-        for (y,x) in idx:
-            # zig-zag layout: 0 starts top left going down but then second column goes up
-            index = x*H + (H-1-y if x%2 else y)
-            m.append(index)
-            m.extend(pixels[y,x]) # RGB values
-        _sock.sendto(bytes(m), (HOST, UDP_PORT))
+    try:
+        for idx in packets:
+            m = []
+            # packet header: https://kno.wled.ge/interfaces/udp-realtime/#udp-realtime
+            m.append(1) # protocol: WARLS (WLED Audio-Reactive-Led-Strip)
+            m.append(2) # wait 2s after the last received packet before returning to normal mode
+            for (y,x) in idx:
+                # zig-zag layout: 0 starts top left going down but then second column goes up
+                index = x*H + (H-1-y if x%2 else y)
+                m.append(index)
+                m.extend(pixels[y,x]) # RGB values
+            _sock.sendto(bytes(m), (HOST, UDP_PORT))
+    except Exception as e:
+        print('update failed:', e)
     prev_pixels = np.copy(pixels)
 
 def clear():
